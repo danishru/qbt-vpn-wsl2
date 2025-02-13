@@ -65,6 +65,8 @@ networkingMode=mirrored
    ```ini
    [wsl2]
    networkingMode=mirrored
+   [experimental]
+   hostAddressLoopback=true
    ```
 3. Сохраните файл и закройте Notepad. При сохранении убедитесь, что файл сохраняется строго как .wslconfig (без дополнительных расширений).
 4. Перезапустите WSL, выполнив в PowerShell:
