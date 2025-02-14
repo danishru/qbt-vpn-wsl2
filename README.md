@@ -15,6 +15,7 @@
 - **Интеграция VPN:** Запуск qBittorrent с VPN позволяет шифровать трафик и скрывать реальный IP-адрес.
 - **Изоляция через Docker:** Использование контейнеров гарантирует чистоту и повторяемость окружения.
 - **WSL2 на Windows:** Использование WSL2 предоставляет нативную Linux-среду, улучшая производительность и совместимость Docker-контейнеров.
+- **Автоматический запуск WSL2:** WSL2 может быть запущен без необходимости входа пользователя в систему, например, через планировщик задач, что позволяет запускать сервисы и контейнеры в автоматическом режиме.
 - **Удобство администрирования:** Благодаря Portainer управление Docker-контейнерами становится простым и интуитивно понятным, что облегчает мониторинг и конфигурацию системы.
 - **Документированная установка:** Подробные инструкции и примеры команд помогут даже новичкам настроить окружение без особых трудностей.
 
@@ -25,6 +26,26 @@
 - **Docker Engine**, установленный непосредственно внутри WSL2 (без использования Docker Desktop).
 - Действительные учетные данные VPN, совместимые с используемым Docker-образом.
 - **Portainer** для графического администрирования Docker.
+
+## Ограничения
+**Службы, запущенные в WSL2, не будут доступны через NAT (например, при подключении через публикацию портов на роутере или VPN).**
+> [!TIP]
+> Для обхода можно использовать:
+> - KeenDNS на роутерах Keenetic ([пример настройки](https://help.keenetic.com/hc/ru/articles/360000563719-%D0%9F%D1%80%D0%B8%D0%BC%D0%B5%D1%80-%D1%83%D0%B4%D0%B0%D0%BB%D0%B5%D0%BD%D0%BD%D0%BE%D0%B3%D0%BE-%D0%B4%D0%BE%D1%81%D1%82%D1%83%D0%BF%D0%B0-%D0%BA-%D0%B2%D0%B5%D0%B1-%D0%BF%D1%80%D0%B8%D0%BB%D0%BE%D0%B6%D0%B5%D0%BD%D0%B8%D1%8F%D0%BC-%D0%B4%D0%BE%D0%BC%D0%B0%D1%88%D0%BD%D0%B5%D0%B9-%D1%81%D0%B5%D1%82%D0%B8-%D1%87%D0%B5%D1%80%D0%B5%D0%B7-KeenDNS)).
+> - Другой хост с Docker где можно использовать NGINX Proxy Manager ([официальный сайт](https://nginxproxymanager.com/)).
+> - Сервер Home Assistant где NGINX Proxy Manager доступен как дополнение ([репозиторий](https://github.com/hassio-addons/addon-nginx-proxy-manager)).
+> - NGINX Reverse Proxy ([документация](https://docs.nginx.com/nginx/admin-guide/web-server/reverse-proxy/)).
+
+**Диски, подключенные в хостовой системе как папки, будут недоступны внутри WSL.**
+> [!NOTE]
+> Дополнительную информацию о настройке точек монтирования и возможных ограничениях смотрите в [официальной документации](https://learn.microsoft.com/ru-ru/windows-server/storage/disk-management/assign-a-mount-point-folder-path-to-a-drive).
+
+> [!TIP]
+> Для обхода этой проблемы можно подключать диски как сетевые папки CIFS внутри Debian. 
+
+**USB-устройства, подключенные к хосту, недоступны из WSL.**
+> [!TIP]
+> Для обхода можно использовать проект USB/IP с открытым исходным кодом. Подробнее можно узнать в [документации](https://learn.microsoft.com/ru-ru/windows/wsl/connect-usb).
 
 ## Как запустить
 ## Шаг 1: Настройка WSL2 и Debian
@@ -58,7 +79,7 @@ networkingMode=mirrored
 hostAddressLoopback=true
 ```
 > [!NOTE]
-> Подробнее можно узнать в [документации WSL](https://learn.microsoft.com/ru-ru/windows/wsl/wsl-config#experimental-settings).
+> Подробнее можно узнать в [документации WSL](https://learn.microsoft.com/ru-ru/windows/wsl/wsl-config#configuration-settings-for-wslconfig).
 #### Как это сделать через PowerShell
 
 1. Откройте PowerShell от имени администратора и выполните следующую команду, чтобы открыть файл `.wslconfig` в блокноте:
@@ -72,12 +93,14 @@ hostAddressLoopback=true
    [experimental]
    hostAddressLoopback=true
    ```
-3. Сохраните файл и закройте Notepad. При сохранении убедитесь, что файл сохраняется строго как .wslconfig (без дополнительных расширений).
-4. Перезапустите WSL, выполнив в PowerShell:
+3. Сохраните файл и закройте Notepad.
+> [!WARNING]
+> При сохранении убедитесь, что файл сохраняется строго как .wslconfig (без дополнительных расширений).
+4. Если WSL был запущен, выполните в PowerShell:
    ```powershell
    wsl --shutdown
    ```
-5. Запустите WSL заново – теперь службы будут доступны на реальном IP-адресе вашей Windows-хост машины, а не только через `localhost`.
+5. Теперь службы WSL будут доступны на реальном IP-адресе вашей Windows-хост машины, а не только через `localhost`.
 ### 1.4. Установка дистрибутива Debian через PowerShell
 
 Для установки Debian через PowerShell выполните следующую команду:
@@ -110,38 +133,35 @@ wsl --install -d Debian
    ```bash
    hostname -I
    ```
-   
-   **Примечание:** Полученный IP-адрес должен совпадать с IP-адресом вашей Windows-хост машины, что подтверждает корректную работу в режиме `mirrored`
+> [!NOTE]
+> Полученный IP-адрес должен совпадать с IP-адресом вашей Windows-хост машины, что подтверждает корректную работу в режиме `mirrored`
 ### Шаг 2: Установка Docker Engine и Portainer
 #### 2.1. Установка Docker Engine
 
-1. Обновите список пакетов и установите необходимые зависимости:
+1. Обновите пакеты и установите зависимости:
    ```bash
    sudo apt update
    sudo apt install apt-transport-https ca-certificates curl gnupg lsb-release -y
    ```
-2. Добавьте официальный ключ GPG Docker:
+2. Добавьте ключ и репозиторий Docker:
    ```bash
    curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-   ```
-3. Добавьте репозиторий Docker в список источников APT:
-   ```bash
    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
    ```
-4. Обновите список пакетов и установите Docker Engine:
+3. Обновите пакеты и установите Docker Engine:
    ```bash
    sudo apt update
    sudo apt install docker-ce docker-ce-cli containerd.io -y
    ```
-5. Проверьте установку Docker, запустив тестовый контейнер:
+4. Проверьте установку, запустив:
    ```bash
    sudo docker run hello-world
    ```
-6. Чтобы запускать Docker без sudo, добавьте своего пользователя в группу docker:
+5. Чтобы запускать Docker без sudo:
    ```bash
    sudo usermod -aG docker $USER
    ```
-   После этого выйдите из системы и войдите снова, чтобы изменения вступили в силу.
+   После этого закройте текущую сессию терминала WSL и откройте новую, чтобы изменения вступили в силу.
 #### 2.2. Установка и запуск Portainer
 
 Portainer предоставляет удобный веб-интерфейс для управления Docker-контейнерами.
@@ -161,9 +181,9 @@ Portainer предоставляет удобный веб-интерфейс д
     -v portainer_data:/data \
     portainer/portainer-ce:latest
     ```
-    Здесь:
-    **9443** — порт для доступа к веб-интерфейсу по HTTPS.
-    **8000** — порт для работы с агентом Portainer (при необходимости).
+> [!NOTE]
+> - **9443** — порт для доступа к веб-интерфейсу по HTTPS.
+> - **8000** — порт для работы с агентом Portainer (при необходимости).
 3. Создайте правило firewall для портов Portainer на Windows-хосте, выполнив в PowerShell:
     ```powershell
     New-NetFirewallRule -DisplayName "Allow Portainer Ports" -Direction Inbound -LocalPort 8000,9443 -Protocol TCP -Action Allow
