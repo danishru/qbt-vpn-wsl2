@@ -137,7 +137,26 @@ wsl --install -d Debian
 > [!NOTE]
 > Полученный IP-адрес должен совпадать с IP-адресом вашей Windows-хост машины, что подтверждает корректную работу в режиме `mirrored`
 ### Шаг 2: Установка Docker Engine и Portainer
-#### 2.1. Установка Docker Engine
+#### 2.1. Создание папки для использования нового пути хранения данных Docker Engin на хосте
+
+> [!TIP]
+> Папка **ProgramData** — это скрытая системная директория Windows, предназначенная для хранения общих данных приложений, доступных всем пользователям системы. Вот несколько ключевых моментов:
+> - **Общее хранилище:** Данные, хранящиеся в ProgramData, не привязаны к конкретному пользователю. Это позволяет приложениям сохранять общие настройки, конфигурационные файлы и другую информацию, которая используется всеми пользователями.
+> - **Расположение:** Обычно эта папка находится по адресу `C:\ProgramData`.
+> - **Системный уровень:** В отличие от пользовательской папки AppData, которая находится в профиле каждого пользователя, ProgramData используется для хранения данных, общих для системы, что упрощает управление настройками и обеспечивает их сохранность при смене или удалении пользовательских профилей.
+> - **Безопасность:** Доступ к этой папке ограничен, что помогает защитить важные системные и программные данные от несанкционированного доступа и изменений.
+> 
+> Использование папки ProgramData для хранения данных Docker Engine (например, в `C:\ProgramData\wls_docker_data\`) повышает безопасность и удобство управления, так как данные будут храниться вне WSL, на уровне Windows-хоста, где к ним имеет доступ системный администратор.
+
+> [!IMPORTANT]  
+> Вы можете использовать любую папку для размещения данных Docker Engine, главное – соблюдать нужные права доступа.
+
+Чтобы создать такую папку через PowerShell (от имени администратора), выполните:
+```powershell
+New-Item -ItemType Directory -Path "C:\ProgramData\wls_docker_data" -Force
+```
+
+#### 2.2. Установка Docker Engine
 
 1. Обновите пакеты и установите зависимости:
    ```bash
@@ -154,16 +173,30 @@ wsl --install -d Debian
    sudo apt update
    sudo apt install docker-ce docker-ce-cli containerd.io -y
    ```
-4. Проверьте установку, запустив:
+4. Настройте Docker Engine для использования нового пути хранения данных. Откройте или создайте файл /etc/docker/daemon.json в Debian:
+   ```bash
+   sudo nano /etc/docker/daemon.json
+   ```
+   Добавьте следующий контент:
+   ```json
+   {
+     "data-root": "/mnt/c/ProgramData/wls_docker_data"
+   }
+   ```
+   Сохраните файл и перезапустите Docker:
+   ```bash
+   sudo systemctl restart docker
+   ```
+5. Проверьте установку, запустив:
    ```bash
    sudo docker run hello-world
    ```
-5. Чтобы запускать Docker без sudo:
+6. Чтобы запускать Docker без sudo:
    ```bash
    sudo usermod -aG docker $USER
    ```
    После этого закройте текущую сессию терминала WSL и откройте новую, чтобы изменения вступили в силу.
-#### 2.2. Установка и запуск Portainer
+#### 2.3. Установка и запуск Portainer
 
 Portainer предоставляет удобный веб-интерфейс для управления Docker-контейнерами.
 
@@ -198,7 +231,11 @@ Portainer предоставляет удобный веб-интерфейс д
 
 ### Шаг 3 (Опционально): Подключение дисков из хостовой системы в WSL 2
 
-Если диски, подключённые на хостовой машине как папки, не доступны напрямую в WSL, их можно смонтировать как сетевые папки (CIFS) внутри Debian. В данном примере используются общие административные папки Windows (Admin$, IPC$, C$) – в частности, папка C$ – и для подключения применяется учетная запись локального администратора "Администратор". Это упрощает настройку, поскольку эти папки создаются по умолчанию в Windows и не требуют дополнительной конфигурации.
+Если диски, подключённые на хостовой машине как папки, не доступны напрямую в WSL, их можно смонтировать как сетевые папки (CIFS) внутри Debian.
+
+В данном примере используются общие административные папки Windows (Admin$, IPC$, C$) – в частности, папка C$ – и для подключения применяется учетная запись локального администратора "Администратор". Это упрощает настройку, поскольку эти папки создаются по умолчанию в Windows и не требуют дополнительной конфигурации.
+> [!NOTE]
+> Подробнее можно узнать в [документации](https://learn.microsoft.com/ru-ru/troubleshoot/windows-server/networking/remove-administrative-shares?source=recommendations).
 
 #### 3.1. Установка пакетов для монтирования CIFS
 
@@ -219,46 +256,125 @@ sudo mkdir -p /share/lib
 
 #### 3.3. #### Скрытие учетных данных с использованием файла /root/.smbcredentials
 
-1. Откройте терминал Debian в WSL2 и выполните следующую команду для редактирования файла с помощью nano:
+- Откройте терминал Debian в WSL2 и выполните следующую команду для редактирования файла с помощью nano:
 ```bash
 sudo nano /root/.smbcredentials
 ```
-2. Вставьте в файл следующие строки:
+- Вставьте в файл следующие строки:
  
 ```ini
 username=YOUR_USERNAME
 password=YOUR_PASSWORD
 ```
 
-(Замените YOUR_USERNAME и YOUR_PASSWORD на ваши реальные данные.)
+(Замените YOUR_USERNAME и YOUR_PASSWORD на ваши реальные данные учетной записи с правами на административные папки.)
 
-3. Сохраните файл и установите безопасные права доступа:
+- Сохраните файл и установите безопасные права доступа:
    
-\`\`\`bash
+```bash
 sudo chmod 600 /root/.smbcredentials
-\`\`\`
+```
 
 #### 3.4. Монтирование сетевой папки CIFS с использованием файла учетных данных
 
 Смонтируйте сетевую папку CIFS. Например, для шары //127.0.0.1/C\$/lib с указанием кодировки UTF-8 выполните:
 
-\`\`\`bash
-sudo mount -t cifs //127.0.0.1/C\$/lib /share/lib -o credentials=/root/.smbcredentials,iocharset=utf8
-\`\`\`
+```bash
+sudo mount -t cifs //127.0.0.1/C$/lib /share/lib -o credentials=/root/.smbcredentials,iocharset=utf8
+```
 
 #### 3.5. Постоянное монтирование при загрузке
 
 Чтобы автоматически монтировать папку при загрузке, отредактируйте файл /etc/fstab:
 
-\`\`\`bash
+```bash
 sudo nano /etc/fstab
-\`\`\`
+```
 
 Добавьте следующую строку в конец файла:
 
+```
+ //127.0.0.1/C$/lib /share/lib cifs credentials=/root/.smbcredentials,iocharset=utf8 0 0
+```
+Сохраните изменения и выйдите из редактора.
+
+### Шаг 4: Установка и настройка binhex/arch-qbittorrentvpn через Portainer Stacks и настройка Windows Firewall
+
+#### 4.1. Создание Stack в Portainer
+> [!TIP]
+> Использование Stack в Portainer позволяет объединить все настройки контейнера в один файл YAML, что значительно упрощает развёртывание, обновление и управление конфигурацией, делая процесс более прозрачным и удобным.
+
+> [!IMPORTANT]  
+> Если вы хотите, чтобы qBittorrent был доступен в локальной сети, замените адрес в параметре LAN_NETWORK (по умолчанию 192.168.0.0/16) на вашу подсеть в формате CIDR.
+
+> [!NOTE]  
+> Более подробную информацию о параметрах можно найти на странице проекта: [@binhex/arch-qbittorrentvpn](https://github.com/binhex/arch-qbittorrentvpn).
+>
+> Наш пример предназначен для запуска qBittorrent в окружении WSL2 с использованием конфигурационного файла .ovpn для OpenVPN.
+
+
+1. Войдите в Portainer и перейдите в раздел **Stacks**.
+2. Нажмите **Add Stack**.
+3. Введите имя Stack, например, `qbittorrentvpn`, и вставьте следующий YAML в редактор стека:
+
+```yaml
+version: '2.1'
+services:
+  qbittorrentvpn:
+    image: binhex/arch-qbittorrentvpn:latest
+    container_name: qbittorrentvpn
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - VPN_ENABLED=yes
+      - VPN_PROV=custom
+      - VPN_CLIENT=openvpn
+      - ENABLE_STARTUP_SCRIPTS=yes
+      - NAME_SERVERS=1.1.1.1,1.0.0.1
+      - WEBUI_PORT=8080
+      - LAN_NETWORK=192.168.0.0/16,localhost,127.0.0.1,172.17.0.0/16
+      - LANG=ru_RU.UTF-8
+      - DEBUG=false
+      - PUID=0
+      - PGID=0
+      - TZ=Europe/Moscow
+    ports:
+      - "8080:8080"
+    volumes:
+      - config:/config
+      - /share/qBittorrent/downloads:/downloads:rw
+      - /share:/share:rw
+      - /etc/localtime:/etc/localtime:ro
+    restart: always
+
+volumes:
+  config:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/c/ProgramData/wls_docker/volumes/qbittorrent_config/_data
+```
+
+4. Нажмите **Deploy the stack** и дождитесь завершения развертывания.
+
+#### 4.2. Создание правила Windows Firewall через PowerShell
+
+Чтобы обеспечить доступ к веб-интерфейсу qBittorrent (порт 8080) с других устройств, создайте правило в Windows Firewall. Выполните в PowerShell (от имени администратора):
+
+```powershell
+New-NetFirewallRule -DisplayName "Allow qBittorrent WebUI" -Direction Inbound -LocalPort 8080 -Protocol TCP -Action Allow
+```
+
+#### 4.3. Доступ к qBittorrent с VPN
+
+После развертывания контейнера:
+- Откройте браузер и перейдите по адресу:
+
 \`\`\`
- //127.0.0.1/C\$/lib /share/lib cifs credentials=/root/.smbcredentials,iocharset=utf8 0 0
+http://<IP-адрес_вашего_сервера>:8080
 \`\`\`
 
-Сохраните изменения и выйдите из редактора.
+- Используйте указанные учетные данные для входа в веб-интерфейс qBittorrent.
+- При необходимости настройте проброс портов или обратный прокси для обеспечения доступа извне.
 
