@@ -221,7 +221,7 @@ sudo apt install cifs-utils -y
 sudo mkdir -p /share/lib
 ```
 
-#### 3.3. #### Скрытие учетных данных с использованием файла /root/.smbcredentials
+#### 3.3. Скрытие учетных данных с использованием файла /root/.smbcredentials
 
 - Откройте терминал Debian в WSL2 и выполните следующую команду для редактирования файла с помощью nano:
 ```bash
@@ -247,7 +247,8 @@ sudo chmod 600 /root/.smbcredentials
 Смонтируйте сетевую папку CIFS. Например, для шары //127.0.0.1/C\$/lib с указанием кодировки UTF-8 выполните:
 
 ```bash
-sudo mount -t cifs //127.0.0.1/C$/lib /share/lib  cifs  credentials=/root/.smbcredentials,iocharset=utf8,file_mode=0777,dir_mode=0777
+sudo mount -t cifs //127.0.0.1/C$/lib /share/lib  cifs  credentials=/root/.smbcredentials,iocharset=utf8,uid=1000,gid=1000,dir_mode=0777,file_mode=0777 0 0
+
 ```
 
 #### 3.5. Постоянное монтирование при загрузке
@@ -261,9 +262,17 @@ sudo nano /etc/fstab
 Добавьте следующую строку в конец файла:
 
 ```
-//127.0.0.1/C$/lib /share/lib  cifs  credentials=/root/.smbcredentials,iocharset=utf8,file_mode=0777,dir_mode=0777  0  0
+//127.0.0.1/C$/lib /share/lib  cifs  credentials=/root/.smbcredentials,iocharset=utf8,uid=1000,gid=1000,dir_mode=0777,file_mode=0777 0 0
 ```
 Сохраните изменения и выйдите из редактора.
+
+> [!TIP]  
+> После внесения изменений в /etc/fstab необходимо перезапустить WSL, чтобы новые настройки вступили в силу. Для этого выполните в PowerShell:
+```powershell
+wsl --shutdown
+```
+Затем запустите WSL заново.
+
 
 ### Шаг 4: Установка и настройка binhex/arch-qbittorrentvpn через Portainer Stacks и настройка Windows Firewall
 #### 4.1. Создание папки для использования нового пути хранения данных qbittorrentvpn на хосте
