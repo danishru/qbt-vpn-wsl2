@@ -96,7 +96,7 @@ hostAddressLoopback=true
    ```
 3. Сохраните файл и закройте Notepad.
 > [!WARNING]
-> При сохранении убедитесь, что файл сохраняется строго как .wslconfig (без дополнительных расширений).
+> **При сохранении убедитесь, что файл сохраняется строго как .wslconfig (без дополнительных расширений).**
 4. Если WSL был запущен, выполните в PowerShell:
    ```powershell
    wsl --shutdown
@@ -350,27 +350,38 @@ New-Item -ItemType Directory -Path "C:\ProgramData\wls_docker\volumes\qbittorren
 > [!TIP]
 > Использование Stack в Portainer позволяет объединить все настройки контейнера в один файл YAML, что значительно упрощает развёртывание, обновление и управление конфигурацией, делая процесс более прозрачным и удобным.
 
-> [!IMPORTANT]  
-> Если вы хотите, чтобы qBittorrent был доступен в локальной сети, замените адрес в параметре LAN_NETWORK (по умолчанию 192.168.0.0/16) на вашу подсеть в формате CIDR.
-
-> [!NOTE]  
-> Более подробную информацию о параметрах можно найти на странице проекта: [@binhex/arch-qbittorrentvpn](https://github.com/binhex/arch-qbittorrentvpn).
->
-> Наш пример предназначен для запуска qBittorrent в окружении WSL2 с использованием конфигурационного файла .ovpn для OpenVPN.
-
-
 1. Войдите в Portainer и перейдите в раздел **Stacks**.
 2. Нажмите **Add Stack**.
 3. Введите имя Stack, например, `qbittorrentvpn`, и вставьте следующий YAML в редактор стека:
 
+> [!WARNING]  
+> Обратите внимание, что следующие пути, указанные в разделе volumes:  
+> - `/share/qBittorrent/downloads:/downloads:rw`  
+> - `/share:/share:rw`  
+> - `device: /mnt/c/ProgramData/wls_docker/volumes/qbittorrentvpn_config/_data`  
+> являются примером для данной настройки. Пожалуйста, измените их в соответствии с вашей конфигурацией, если вы используете другие пути.
+
+> [!IMPORTANT]  
+> Если вы хотите, чтобы qBittorrent был доступен в локальной сети, замените адрес в параметре LAN_NETWORK (по умолчанию `192.168.0.0/16`) на вашу подсеть в формате CIDR.
+
+> [!NOTE]  
+> Более подробную информацию о параметрах можно найти на странице проекта: [@binhex/arch-qbittorrentvpn](https://github.com/binhex/arch-qbittorrentvpn). Наш пример предназначен для запуска qBittorrent в окружении WSL2 с использованием конфигурационного файла .ovpn для OpenVPN.
+
+
 ```yaml
-version: '2.1'
+version: '3.8'
 services:
   qbittorrentvpn:
     image: binhex/arch-qbittorrentvpn:latest
     container_name: qbittorrentvpn
     cap_add:
       - NET_ADMIN
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsSL http://localhost:$${WEBUI_PORT}/api/v2/app/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     environment:
       - VPN_ENABLED=yes
       - VPN_PROV=custom
@@ -381,8 +392,8 @@ services:
       - LAN_NETWORK=192.168.0.0/16,localhost,127.0.0.1,172.17.0.0/16
       - LANG=ru_RU.UTF-8
       - DEBUG=false
-      - PUID=0
-      - PGID=0
+      - PUID=1000
+      - PGID=1000
       - TZ=Europe/Moscow
     ports:
       - "8080:8080"
@@ -392,7 +403,6 @@ services:
       - /share:/share:rw
       - /etc/localtime:/etc/localtime:ro
     restart: always
-
 volumes:
   config:
     driver: local
@@ -414,13 +424,14 @@ New-NetFirewallRule -DisplayName "Allow qBittorrent WebUI" -Direction Inbound -L
 
 #### 4.4. Доступ к qBittorrent с VPN
 
-После развертывания контейнера:
-- Откройте браузер и перейдите по адресу:
+1. Если переменная `VPN_ENABLED=yes`, убедитесь, что вы разместили файл с настройками OpenVPN (.ovpn) в папке `/openvpn` внутри volume `config`. Этот файл необходим для установления VPN-соединения.
 
-```
-http://<IP-адрес_вашего_сервера>:8080
-```
+2. После размещения файла перезапустите контейнер или дождитесь, пока контейнер обнаружит и применит настройки из файла.
 
-- Используйте указанные учетные данные для входа в веб-интерфейс qBittorrent.
-- При необходимости настройте проброс портов или обратный прокси для обеспечения доступа извне.
+3. Откройте браузер и перейдите по адресу:
+   `
+http://<IP-адрес_вашего_сервера>:${WEBUI_PORT}
+   `
+
+4. Для входа в веб-интерфейс qBittorrent используйте учетные данные, которые автоматически генерируются и отображаются в файле `supervisord.log` внутри volume `config`.
 
