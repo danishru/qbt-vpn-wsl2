@@ -247,7 +247,7 @@ sudo chmod 600 /root/.smbcredentials
 Смонтируйте сетевую папку CIFS. Например, для шары //127.0.0.1/C\$/lib с указанием кодировки UTF-8 выполните:
 
 ```bash
-sudo mount -t cifs //127.0.0.1/C$/lib /share/lib -o credentials=/root/.smbcredentials,iocharset=utf8
+sudo mount -t cifs //127.0.0.1/C$/lib /share/lib  cifs  credentials=/root/.smbcredentials,iocharset=utf8,file_mode=0777,dir_mode=0777
 ```
 
 #### 3.5. Постоянное монтирование при загрузке
@@ -261,7 +261,7 @@ sudo nano /etc/fstab
 Добавьте следующую строку в конец файла:
 
 ```
- //127.0.0.1/C$/lib /share/lib cifs credentials=/root/.smbcredentials,iocharset=utf8 0 0
+//127.0.0.1/C$/lib /share/lib  cifs  credentials=/root/.smbcredentials,iocharset=utf8,file_mode=0777,dir_mode=0777  0  0
 ```
 Сохраните изменения и выйдите из редактора.
 
