@@ -202,10 +202,12 @@ Portainer предоставляет удобный веб-интерфейс д
 > [!NOTE]
 > - **9443** — порт для доступа к веб-интерфейсу по HTTPS.
 > - **8000** — порт для работы с агентом Portainer (при необходимости).
-3. Создайте правило firewall для портов Portainer на Windows-хосте, выполнив в PowerShell:
-    ```powershell
-    New-NetFirewallRule -DisplayName "Allow Portainer Ports" -Direction Inbound -LocalPort 8000,9443 -Protocol TCP -Action Allow
-    ```
+3. Создание правила Windows Firewall для портов Portaine.
+
+   Чтобы создать правило Windows Firewall для портов Portainer (8000 и 9443) только если оно ещё не существует, выполните следующую однострочную команду в PowerShell (от имени администратора):
+   ```powershell
+   if (-not (Get-NetFirewallRule -DisplayName "Allow Portainer Ports" -ErrorAction SilentlyContinue)) { New-NetFirewallRule -DisplayName "Allow Portainer Ports" -Direction Inbound -LocalPort 8000,9443 -Protocol TCP -Action Allow }
+   ```
 4. Доступ к Portainer:
    Откройте браузер и перейдите по адресу:
    
