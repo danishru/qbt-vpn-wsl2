@@ -214,6 +214,11 @@ Portainer предоставляет удобный веб-интерфейс д
    `https://<IP-адрес_вашего_Windows-хоста>:9443`
 
    При первом запуске вам будет предложено создать учетную запись администратора.
+> [!IMPORTANT]
+> Если веб-интерфейс Portainer сообщает "Your Portainer instance timed out for security purposes. To re-enable your Portainer instance, you will need to restart Portainer.", перезапустите контейнер, выполнив:
+> ```bash
+> sudo docker restart portainer
+> ```
 
 ### Шаг 3 (Опционально): Подключение дисков из хостовой системы в WSL 2
 
