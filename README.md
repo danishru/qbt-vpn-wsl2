@@ -268,11 +268,10 @@ sudo chmod 600 /root/.smbcredentials
 
 #### 3.4. Монтирование сетевой папки CIFS с использованием файла учетных данных
 
-Смонтируйте сетевую папку CIFS. Например, для шары //127.0.0.1/C\$/lib с указанием кодировки UTF-8 выполните:
+Для проверки корректности монтирования перед автоматическим монтированием при загрузке выполните следующую команду. Это позволит убедиться, что параметры монтирования заданы правильно:
 
 ```bash
-sudo mount -t cifs //127.0.0.1/C$/lib /share/lib  cifs  credentials=/root/.smbcredentials,iocharset=utf8,uid=1000,gid=1000,dir_mode=0777,file_mode=0777
-
+sudo mount -t cifs //127.0.0.1/C$/lib /share/lib -o credentials=/root/.smbcredentials,iocharset=utf8,uid=1000,gid=1000,dir_mode=0777,file_mode=0777
 ```
 
 #### 3.5. Постоянное монтирование при загрузке
