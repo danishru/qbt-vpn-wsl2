@@ -177,7 +177,11 @@ sudo passwd root
    ```bash
    sudo docker run hello-world
    ```
-5. Чтобы запускать Docker без sudo:
+5. После проверки установки удалите тестовый контейнер hello-world, чтобы освободить место:
+   ```bash
+   sudo docker rm $(sudo docker ps -a --filter "ancestor=hello-world" -q)
+   ```
+6. Чтобы запускать Docker без sudo:
    ```bash
    sudo usermod -aG docker $USER
    ```
@@ -190,6 +194,7 @@ Portainer предоставляет удобный веб-интерфейс д
    ```bash
    sudo docker volume create portainer_data
    ```
+   > sudo docker volume create --driver local --opt type=none --opt o=bind --opt device=/mnt/c/ProgramData/wls_docker/volumes/portainer_data/_data portainer_data
 2. Запустите контейнер Portainer:
     ```bash
     sudo docker run -d \
@@ -375,7 +380,7 @@ New-Item -ItemType Directory -Path "C:\ProgramData\wls_docker\volumes\qbittorren
 
 > [!IMPORTANT]  
 > Обратите внимание, что следующие пути, указанные в разделе volumes:  
-> - `/share/qBittorrent/downloads:/downloads:rw`  
+> - `/mnt/d/qBittorrent/downloads:/downloads:rw`  
 > - `/share:/share:rw`  
 > - `device: /mnt/c/ProgramData/wls_docker/volumes/qbittorrentvpn_config/_data`  
 > 
@@ -419,7 +424,7 @@ services:
       - "8080:8080"
     volumes:
       - config:/config
-      - /share/qBittorrent/downloads:/downloads:rw
+      - /mnt/d/qBittorrent/downloads:/downloads:rw
       - /share:/share:rw
       - /etc/localtime:/etc/localtime:ro
     restart: always
@@ -549,7 +554,10 @@ wsl --install -d Ubuntu
 ```powershell
 New-Item -ItemType Directory -Force -Path C:\kernel; Invoke-WebRequest -Uri "https://github.com/danishru/qbt-vpn-wsl2/raw/refs/heads/main/modif-linux-msft-wsl-6.6.75.1" -OutFile "C:\kernel\modif-linux-msft-wsl-6.6.75.1"
 ```
-> Разница между скачиванием готового ядра и сборкой из исходников заключается в том, что скачивание готового ядра позволяет сразу использовать собранный образ, тогда как сборка из исходников дает возможность внести дополнительные изменения в конфигурацию или оптимизировать сборку под свои задачи.
+> [!TIP]  
+> Сборка ядра из исходников даёт полный контроль над настройками и возможность оптимизации под конкретные задачи.
+> 
+> Готовое ядро устанавливается быстро и просто, но его универсальная конфигурация может не учитывать специфические требования.
 #### 5.4. Установка и использование нового ядра:
 После успешной сборки перенесите (или установите) скомпилированный файл ядра в нужное место и настройте WSL для его использования, отредактировав файл \`.wslconfig\` в вашем профиле Windows. Например, если вы скопировали образ ядра по пути `/mnt/c/kernel/modif-linux-msft-wsl-6.6.75.1` (этот путь указан как пример, вы можете использовать любой удобный), выполните следующие действия:
 
