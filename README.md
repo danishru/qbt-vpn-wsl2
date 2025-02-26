@@ -180,21 +180,41 @@ sudo passwd root
 5. После проверки установки удалите тестовый контейнер hello-world, чтобы освободить место:
    ```bash
    sudo docker rm $(sudo docker ps -a --filter "ancestor=hello-world" -q)
+   sudo docker rmi hello-world
    ```
 6. Чтобы запускать Docker без sudo:
    ```bash
    sudo usermod -aG docker $USER
    ```
    После этого закройте текущую сессию терминала WSL и откройте новую, чтобы изменения вступили в силу.
+#### 2.2. Создание папки для размещения томов Docker на хосте
+
+> [!TIP]  
+> Папка **ProgramData** — это скрытая системная директория Windows, предназначенная для хранения общих данных приложений, доступных всем пользователям системы. Вот несколько ключевых моментов:
+> - **Общее хранилище:** Данные, хранящиеся в ProgramData, не привязаны к конкретному пользователю. Это позволяет приложениям сохранять общие настройки, конфигурационные файлы и другую информацию, которая используется всеми пользователями.
+> - **Расположение:** Обычно эта папка находится по адресу `C:\ProgramData`.
+> - **Системный уровень:** В отличие от пользовательской папки AppData, которая находится в профиле каждого пользователя, ProgramData используется для хранения данных, общих для системы, что упрощает управление настройками и обеспечивает их сохранность при смене или удалении пользовательских профилей.
+> - **Безопасность:** Доступ к этой папке ограничен, что помогает защитить важные системные и программные данные от несанкционированного доступа и изменений.
+> - **Резервное копирование:** Хранение томов Docker вне WSL позволяет легко создавать резервные копии данных томов с помощью стандартных средств Windows, что обеспечивает дополнительную защиту и упрощает восстановление данных в случае необходимости.
+> 
+> Использование папки ProgramData для хранения данных томов Docker (например, в `C:\ProgramData\wls_docker\volumes`) повышает безопасность и удобство управления, так как данные будут храниться вне WSL, на уровне Windows-хоста, где к ним имеет доступ системный администратор.
+
+> [!IMPORTANT]  
+> Вы можете использовать любую папку для размещения данных томов Docker, главное – соблюдать нужные права доступа.
+
+Чтобы создать такую папку через PowerShell (от имени администратора), выполните:
+```powershell
+New-Item -ItemType Directory -Path "C:\ProgramData\wls_docker\volumes" -Force
+```
 #### 2.3. Установка и запуск Portainer
 
 Portainer предоставляет удобный веб-интерфейс для управления Docker-контейнерами.
 
 1. Создайте volume для хранения данных Portainer:
    ```bash
-   sudo docker volume create portainer_data
+   sudo mkdir -p /mnt/c/ProgramData/wls_docker/volumes/portainer_data/_data
+   sudo docker volume create --driver local --opt type=none --opt o=bind --opt device=/mnt/c/ProgramData/wls_docker/volumes/portainer_data/_data portainer_data
    ```
-   > sudo docker volume create --driver local --opt type=none --opt o=bind --opt device=/mnt/c/ProgramData/wls_docker/volumes/portainer_data/_data portainer_data
 2. Запустите контейнер Portainer:
     ```bash
     sudo docker run -d \
@@ -227,119 +247,154 @@ Portainer предоставляет удобный веб-интерфейс д
 > sudo docker restart portainer
 > ```
 
-### Шаг 3 (Опционально): Подключение дисков из хостовой системы в WSL 2
+### Шаг 3 (Опционально): Подключение разделов Windows, назначенных как точки монтирования, в WSL 2
 
-Если диски, подключённые на хостовой машине как папки, не доступны напрямую в WSL, их можно смонтировать как сетевые папки (CIFS) внутри Debian.
+> [!IMPORTANT]
+> В некоторых случаях разделы Windows могут быть назначены (смонтированы) как папки (точки монтирования) на уровне хостовой системы, эта функциональность описанна в [официальной документации](https://learn.microsoft.com/ru-ru/windows-server/storage/disk-management/assign-a-mount-point-folder-path-to-a-drive).
+>
+> 
+> Это приводит к недоступности работы с данными раздела напрямую из WSL 2. Это обусловлено особенностями работы WSL 2 с назначенными в Windows точками монтирования согласно обсуждению [WSL issue #5356](https://github.com/microsoft/WSL/issues/5356)). Кроме того, подобное поведение может вызывать проблемы при работе Docker (см. [docker/for-win issue #7992](https://github.com/docker/for-win/issues/7992)).
+
+В WSL можно подключить такой раздел, уже назначенный как папка, с помощью двух подходов:
+
+#### 3.1. Ручное подключение раздела через drvfs (рекомендуемый способ)
+
+Этот метод позволяет подключить разделы Windows, назначенные как точки монтирования (папки), непосредственно в WSL 2 с использованием драйвера drvfs. В нашем случае необходимо примонтировать три папки:
+- `C:\lib\lib01`
+- `C:\lib\lib02`
+- `C:\lib\lib03`
+
+1. Создание точек монтирования в WSL
+   Перед подключением разделов необходимо создать соответствующие каталоги (точки монтирования) в WSL. Выполните:
+   ```bash
+   sudo mkdir -p /share/lib/lib01
+   sudo mkdir -p /share/lib/lib02
+   sudo mkdir -p /share/lib/lib03
+   ```
+2. Ручное монтирование папок через drvfs
+   Подключите каждую из папок Windows с помощью команды `mount` с указанием типа файловой системы `drvfs`:
+   ```bash
+   sudo mount -t drvfs C:\\lib\\lib01 /share/lib/lib01
+   sudo mount -t drvfs C:\\lib\\lib02 /share/lib/lib02
+   sudo mount -t drvfs C:\\lib\\lib03 /share/lib/lib03
+   ```
+3. Автоматическое монтирование через /etc/fstab
+   Чтобы эти папки монтировались автоматически при запуске WSL, отредактируйте файл \`/etc/fstab\`. Откройте файл:
+   ```bash
+   sudo nano /etc/fstab
+   ```
+   Добавьте следующие строки в конец файла:
+   ```
+   C:\lib\lib01 /share/lib/lib01 drvfs defaults 0 0
+   C:\lib\lib02 /share/lib/lib02 drvfs defaults 0 0
+   C:\lib\lib03 /share/lib/lib03 drvfs defaults 0 0
+   ```
+   Сохраните изменения (CTRL+X, затем Y, затем ENTER) и закройте редактор.
+
+Теперь при каждом запуске WSL папки `C:\lib\lib01`, `C:\lib\lib02` и `C:\lib\lib03` будут автоматически примонтированы в соответствующие точки монтирования в WSL.
+> [!TIP]  
+> После внесения изменений необходимо перезапустить WSL, чтобы новые настройки вступили в силу. Для этого выполните в PowerShell:
+```powershell
+wsl --shutdown
+```
+Затем запустите WSL заново.
+
+> [!NOTE]  
+> Подробнее о drvfs в WSL можно узнать в [документации WSL](https://learn.microsoft.com/ru-ru/windows/wsl/file-permissions#accessing-files-in-the-windows-drive-file-system-drvfs-from-linux).
+
+#### 3.2. Подключение раздела как сетевой ресурс (CIFS)
+
+Если по каким-либо причинам прямое монтирование через drvfs недоступно или требуется использовать параметры CIFS, вы можете смонтировать раздел, назначенный как папка, как сетевой ресурс. 
 
 В данном примере используются общие административные папки Windows `(Admin$, IPC$, C$)` – в частности, папка `C$` – и для подключения применяется учетная запись локального администратора "Администратор". Это упрощает настройку, поскольку эти папки создаются по умолчанию в Windows и не требуют дополнительной конфигурации.
+
 > [!NOTE]
 > Подробнее можно узнать в [документации](https://learn.microsoft.com/ru-ru/troubleshoot/windows-server/networking/remove-administrative-shares?source=recommendations).
 
-#### 3.1. Установка пакетов для монтирования CIFS
-
-Перед монтированием убедитесь, что в Debian установлены необходимые пакеты:
-
-```bash
-sudo apt update
-sudo apt install cifs-utils -y
-```
-
-#### 3.2. Создание каталога для монтирования
-
-Создайте каталог в Debian, куда будет монтироваться сетевая папка. Например:
-
-```bash
-sudo mkdir -p /share/lib
-```
-
-#### 3.3. Скрытие учетных данных с использованием файла /root/.smbcredentials
-
-- Откройте терминал Debian в WSL2 и выполните следующую команду для редактирования файла с помощью nano:
-```bash
-sudo nano /root/.smbcredentials
-```
-- Вставьте в файл следующие строки:
- 
-```ini
-username=YOUR_USERNAME
-password=YOUR_PASSWORD
-```
-
-(Замените YOUR_USERNAME и YOUR_PASSWORD на ваши реальные данные учетной записи с правами на административные папки.)
-
-- Сохраните файл и установите безопасные права доступа:
+1. Установка пакетов для монтирования CIFS
+   Перед монтированием убедитесь, что в Debian установлены необходимые пакеты:
+   ```bash
+   sudo apt update
+   sudo apt install cifs-utils -y
+   ```
+2. Создание каталога для монтирования
+   Создайте каталог в Debian, куда будет монтироваться сетевая папка. Например:
+   ```bash
+   sudo mkdir -p /share/lib
+   ```
+3. Скрытие учетных данных с использованием файла /root/.smbcredentials
+   - Откройте терминал Debian в WSL2 и выполните следующую команду для редактирования файла с помощью nano:
+   ```bash
+   sudo nano /root/.smbcredentials
+   ```
+   - Вставьте в файл следующие строки:
+   ```ini
+   username=YOUR_USERNAME
+   password=YOUR_PASSWORD
+   ```
+   (Замените YOUR_USERNAME и YOUR_PASSWORD на ваши реальные данные учетной записи с правами на административные папки.)
+   - Сохраняем (CTRL+X, затем Y, затем ENTER) и устанавливаем безопасные права доступа:  
+   ```bash
+   sudo chmod 600 /root/.smbcredentials
+   ```
+4. Монтирование сетевой папки CIFS с использованием файла учетных данных
+   Для проверки корректности монтирования перед автоматическим монтированием при загрузке выполните следующую команду. Это позволит убедиться, что параметры монтирования заданы правильно:
+   ```bash
+   sudo mount -t cifs //127.0.0.1/C$/lib /share/lib -o credentials=/root/.smbcredentials,iocharset=utf8,uid=1000,gid=1000,dir_mode=0777,file_mode=0777
+   ```
+5. Постоянное монтирование при загрузке
+   Чтобы автоматически монтировать папку при загрузке, отредактируйте файл /etc/fstab:
+   ```bash
+   sudo nano /etc/fstab
+   ```
+   Добавьте следующую строку в конец файла:
+   ```
+   //127.0.0.1/C$/lib /share/lib  cifs  credentials=/root/.smbcredentials,iocharset=utf8,uid=1000,gid=1000,dir_mode=0777,file_mode=0777 0 0
+   ```
+   Сохраняем (CTRL+X, затем Y, затем ENTER).
    
-```bash
-sudo chmod 600 /root/.smbcredentials
-```
-
-#### 3.4. Монтирование сетевой папки CIFS с использованием файла учетных данных
-
-Для проверки корректности монтирования перед автоматическим монтированием при загрузке выполните следующую команду. Это позволит убедиться, что параметры монтирования заданы правильно:
-
-```bash
-sudo mount -t cifs //127.0.0.1/C$/lib /share/lib -o credentials=/root/.smbcredentials,iocharset=utf8,uid=1000,gid=1000,dir_mode=0777,file_mode=0777
-```
-
-#### 3.5. Постоянное монтирование при загрузке
-
-Чтобы автоматически монтировать папку при загрузке, отредактируйте файл /etc/fstab:
-
-```bash
-sudo nano /etc/fstab
-```
-
-Добавьте следующую строку в конец файла:
-
-```
-//127.0.0.1/C$/lib /share/lib  cifs  credentials=/root/.smbcredentials,iocharset=utf8,uid=1000,gid=1000,dir_mode=0777,file_mode=0777 0 0
-```
-Сохраните изменения и выйдите из редактора.
-
-#### 3.6. Пробуждение содержимого CIFS-папки
+**Пробуждение содержимого CIFS-папки**
 
 > [!IMPORTANT]
 > Обратите внимание, что если CIFS-папка содержит каталоги, представляющие смонтированные диски в Windows, они могут быть недоступны для контейнеров в Docker до тех пор, пока их не "пробудят" командой ls -ld в системе WSL. Для автоматического обновления состояния таких папок после запуска WSL создайте следующий скрипт:
 
-- Открываем файл:
-
-```bash
-sudo nano /usr/local/bin/wake_cifs.sh
-```
-- Заменяем код:
-
-```bash
-#!/bin/bash
-# Скрипт для "пробуждения" содержимого только второго уровня в /share/lib/
-
-SHARE_PATH="/share/lib"
-
-# Перебираем все папки первого уровня
-for subdir in "$SHARE_PATH"/*; do
-    if [ -d "$subdir" ]; then
-        # Прочитываем содержимое второго уровня (но не глубже)
-        ls -la "$subdir" >/dev/null 2>&1
-    fi
-done
-```
-- Сохраняем (CTRL+X, затем Y, затем ENTER) и делаем исполняемым:
-```bash
-sudo chmod +x /usr/local/bin/wake_cifs.sh
-```
-- Запускаем вручную, чтобы проверить, работает ли:
-```bash
-sudo /usr/local/bin/wake_cifs.sh
-```
-**Автоматический запуск при старте WSL**
-- Открываем /etc/wsl.conf:
-```bash
-sudo nano /etc/wsl.conf
-```
-- Добавляем:
-```ini
-[boot]
-command=/usr/local/bin/wake_cifs.sh
-```
+1. Открываем файл:
+   ```bash
+   sudo nano /usr/local/bin/wake_cifs.sh
+   ```
+2. Заменяем код:
+   ```bash
+   #!/bin/bash
+   # Скрипт для "пробуждения" содержимого только второго уровня в /share/lib/
+   
+   SHARE_PATH="/share/lib"
+   
+   # Перебираем все папки первого уровня
+   for subdir in "$SHARE_PATH"/*; do
+       if [ -d "$subdir" ]; then
+           # Прочитываем содержимое второго уровня (но не глубже)
+           ls -la "$subdir" >/dev/null 2>&1
+       fi
+   done
+   ```
+3. Сохраняем (CTRL+X, затем Y, затем ENTER) и делаем исполняемым:
+      ```bash
+      sudo chmod +x /usr/local/bin/wake_cifs.sh
+      ```
+   - Запускаем вручную, чтобы проверить, работает ли:
+      ```bash
+      sudo /usr/local/bin/wake_cifs.sh
+      ```
+4. Автоматический запуск при старте WSL
+   - Открываем /etc/wsl.conf:
+      ```bash
+      sudo nano /etc/wsl.conf
+      ```
+   - Добавляем:
+      ```ini
+      [boot]
+      command=/usr/local/bin/wake_cifs.sh
+      ```
 Теперь CIFS автоматически "будет пробуждаться" при каждом запуске WSL.
 
 > [!TIP]  
@@ -351,26 +406,12 @@ wsl --shutdown
 
 
 ### Шаг 4: Установка и настройка binhex/arch-qbittorrentvpn через Portainer Stacks и настройка Windows Firewall
-#### 4.1. Создание папки для использования нового пути хранения данных qbittorrentvpn на хосте
-
-> [!TIP]
-> Папка **ProgramData** — это скрытая системная директория Windows, предназначенная для хранения общих данных приложений, доступных всем пользователям системы. Вот несколько ключевых моментов:
-> - **Общее хранилище:** Данные, хранящиеся в ProgramData, не привязаны к конкретному пользователю. Это позволяет приложениям сохранять общие настройки, конфигурационные файлы и другую информацию, которая используется всеми пользователями.
-> - **Расположение:** Обычно эта папка находится по адресу `C:\ProgramData`.
-> - **Системный уровень:** В отличие от пользовательской папки AppData, которая находится в профиле каждого пользователя, ProgramData используется для хранения данных, общих для системы, что упрощает управление настройками и обеспечивает их сохранность при смене или удалении пользовательских профилей.
-> - **Безопасность:** Доступ к этой папке ограничен, что помогает защитить важные системные и программные данные от несанкционированного доступа и изменений.
-> 
-> Использование папки ProgramData для хранения данных qbittorrentvpn (например, в `C:\ProgramData\wls_docker\volumes\qbittorrentvpn_config\_data`) повышает безопасность и удобство управления, так как данные будут храниться вне WSL, на уровне Windows-хоста, где к ним имеет доступ системный администратор.
-
-> [!IMPORTANT]  
-> Вы можете использовать любую папку для размещения данных qbittorrentvpn, главное – соблюдать нужные права доступа.
-
-Чтобы создать такую папку через PowerShell (от имени администратора), выполните:
-```powershell
-New-Item -ItemType Directory -Path "C:\ProgramData\wls_docker\volumes\qbittorrentvpn_config\_data" -Force
+### Предварительный шаг: Создание папки для хранения тома
+Перед развёртыванием Stack убедитесь, что на хосте создана папка для хранения данных тома `qbittorrentvpn_config`. Если папки не существует, создайте её вручную. Например, в WSL или терминале с правами администратора выполните:
+```bash
+sudo mkdir -p /mnt/c/ProgramData/wls_docker/volumes/qbittorrentvpn_config/_data
 ```
-
-#### 4.2. Создание Stack в Portainer
+#### 4.1. Создание Stack в Portainer
 > [!TIP]
 > Использование Stack в Portainer позволяет объединить все настройки контейнера в один файл YAML, что значительно упрощает развёртывание, обновление и управление конфигурацией, делая процесс более прозрачным и удобным.
 
@@ -442,7 +483,7 @@ volumes:
 > [!TIP]
 > При необходимости вы всегда можете подкорректировать параметры в данном YAML-файле и легко переразвернуть образ, чтобы настроить контейнер в соответствии с вашими текущими потребностями.
 
-#### 4.3. Создание правила Windows Firewall через PowerShell
+#### 4.2. Создание правила Windows Firewall через PowerShell
 
 Чтобы обеспечить доступ к веб-интерфейсу qBittorrent (порт 8080) с других устройств, выполните следующую однострочную команду в PowerShell (от имени администратора). Эта команда создаст правило только если оно ещё не существует:
 
@@ -450,7 +491,7 @@ volumes:
 if (-not (Get-NetFirewallRule -DisplayName "Allow qBittorrent WebUI" -ErrorAction SilentlyContinue)) { New-NetFirewallRule -DisplayName "Allow qBittorrent WebUI" -Direction Inbound -LocalPort 8080 -Protocol TCP -Action Allow }
 ```
 
-#### 4.4. Доступ к qBittorrent с VPN
+#### 4.3. Доступ к qBittorrent с VPN
 
 1. Если переменная `VPN_ENABLED=yes`, убедитесь, что вы разместили файл с настройками OpenVPN (.ovpn) в папке `/openvpn` внутри volume `config`. Этот файл необходим для установления VPN-соединения.
 
@@ -499,7 +540,7 @@ wsl --install -d Ubuntu
 #### 5.3. Сборка нового ядра:
 Наша инструкция сборки ядра основана на официальной инструкции, с заменой конфигурационного файла на наш из репозитория. Для этого выполните следующие шаги:
 > [!NOTE]  
-> Официальную документацию по сборке ядра для WSL можно найти по ссылке: [WSL User Kernel v6](https://learn.microsoft.com/en-us/community/content/wsl-user-msft-kernel-v6).
+> Официальную документацию по сборке ядра для WSL можно найти по ссылке: [WSL User Kernel v6](https://learn.microsoft.com/ru-ru/community/content/wsl-user-msft-kernel-v6).
 
 1. Запустите дистрибутив Ubuntu и перейдите в корень файловой системы:
    ```bash
@@ -571,7 +612,7 @@ New-Item -ItemType Directory -Force -Path C:\kernel; Invoke-WebRequest -Uri "htt
    kernel=C:\\kernel\\modif-linux-msft-wsl-6.6.75.1
    ```
 > [!NOTE]  
-> Подробнее о параметрах конфигурации WSL можно узнать в [документации WSL](https://learn.microsoft.com/en-us/windows/wsl/wsl-config#configuration-settings-for-wslconfig).
+> Подробнее о параметрах конфигурации WSL можно узнать в [документации WSL](https://learn.microsoft.com/ru-ru/windows/wsl/wsl-config#configuration-settings-for-wslconfig).
 
 3. Сохраните файл и закройте Notepad.
 
@@ -592,3 +633,30 @@ wsl --unregister Ubuntu
 > Замените `Ubuntu` на имя использованного дистрибутива, если необходимо.
 
 Таким образом, вы сможете собрать и установить оптимизированное ядро Linux для WSL2 и Docker, используя новый дистрибутив Ubuntu, установленный из Microsoft Store.
+
+### Шаг 6. Опционально: Настройка ресурсов и параметров WSL 2 через файл `.wslconfig`
+
+1. Откройте PowerShell от имени администратора и выполните команду для открытия файла `.wslconfig` в Notepad:
+   ```powershell
+   notepad \$env:USERPROFILE\.wslconfig
+   ```
+
+2. В файле `.wslconfig` найдите раздел `[wsl2]` и дополните его параметрами для тонкой настройки ресурсов. Например, вы можете добавить следующие строки:
+   ```ini
+   [wsl2]
+   memory=8GB
+   processors=4
+   [experimental]
+   autoMemoryReclaim=gradual
+   ```
+> [!NOTE]  
+> Подробнее о параметрах конфигурации WSL можно узнать по [wsl2](https://learn.microsoft.com/ru-ru/windows/wsl/wsl-config#main-wsl-settings) и [experimental](https://learn.microsoft.com/ru-ru/windows/wsl/wsl-config#experimental-settings).
+
+3. Сохраните файл и закройте Notepad.
+
+4. Если WSL был запущен, выполните в PowerShell:
+   ```powershell
+   wsl --shutdown
+   ```
+> [!IMPORTANT]  
+> Если у вас установлено несколько дистрибутивов, все они будут использовать одни и те же настройки ресурсов.
