@@ -48,12 +48,12 @@
 > - Сервер Home Assistant где NGINX Proxy Manager доступен как дополнение ([репозиторий](https://github.com/hassio-addons/addon-nginx-proxy-manager)).
 > - NGINX Reverse Proxy ([документация](https://docs.nginx.com/nginx/admin-guide/web-server/reverse-proxy/)).
 
-**Диски, подключенные в хостовой системе как папки, будут недоступны внутри WSL.**
-> [!NOTE]
-> Дополнительную информацию о настройке точек монтирования и возможных ограничениях смотрите в [официальной документации](https://learn.microsoft.com/ru-ru/windows-server/storage/disk-management/assign-a-mount-point-folder-path-to-a-drive).
-
+**Диски, подключенные в хостовой системе как папки, будут недоступны внутри WSL2.**
 > [!TIP]
 > Для решения этой проблемы рекомендуется вручную подключать такие разделы с помощью drvfs или CIFS, как описано в [Шаге 3 (Опционально)](#шаг-3-опционально-подключение-разделов-windows-назначенных-как-точки-монтирования-в-wsl-2).
+
+> [!NOTE]
+> Дополнительную информацию о настройке точек монтирования и возможных ограничениях смотрите в [официальной документации](https://learn.microsoft.com/ru-ru/windows-server/storage/disk-management/assign-a-mount-point-folder-path-to-a-drive).
 
 **USB-устройства, подключенные к хосту, недоступны из WSL.**
 > [!TIP]
