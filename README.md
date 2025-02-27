@@ -104,7 +104,7 @@
    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
    ```
 
-2. **Установите Docker Engine:**
+2. **Установите Docker Engine и настройка прав доступа на каталог:**
    ```bash
    sudo apt update
    sudo apt install docker-ce docker-ce-cli containerd.io -y
