@@ -108,6 +108,9 @@
    ```bash
    sudo apt update
    sudo apt install docker-ce docker-ce-cli containerd.io -y
+   sudo usermod -aG docker $USER
+   sudo chown -R root:docker /var/lib/docker
+   sudo chmod -R 770 /var/lib/docker
    ```
 
 3. **Проверьте установку:**
@@ -172,7 +175,7 @@
 2. **Запустите Docker Compose:**  
    В том же каталоге выполните:
    ```bash
-   sudo docker compose up -d
+   sudo docker compose -p qbittorrentvpn up -d
    ```
 ---
 
