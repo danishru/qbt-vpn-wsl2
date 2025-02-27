@@ -108,13 +108,10 @@
    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
    ```
 
-2. **Установите Docker Engine и настройка прав доступа на каталог:**
+2. **Установите Docker Engine:**
    ```bash
    sudo apt update
    sudo apt install docker-ce docker-ce-cli containerd.io -y
-   sudo usermod -aG docker $USER
-   sudo chown -R root:docker /var/lib/docker
-   sudo chmod -R 770 /var/lib/docker
    ```
 
 3. **Проверьте установку:**
@@ -130,8 +127,16 @@
 ---
 
 ### Шаг 3: Развёртывание qBittorrentVPN с Docker Compose
+1. **Создайте папку для тома конфигурации**
+   
+   Используем bind mount, чтобы данные тома находились внутри WSL, но были доступны напрямую из Windows.  
+   Создайте папку, например, по пути:
+   ```bash
+   sudo mkdir -p /srv/docker/volumes/qbittorrentvpn_config/_data
+   ```
 
-1. **Создайте файл docker-compose.yml**  
+3. **Создайте файл docker-compose.yml**
+   
    Перейдите в нужный каталог и запустите nano для создания файла:
    ```bash
    sudo nano docker-compose.yml
@@ -171,10 +176,15 @@
        restart: always
    volumes:
      config:
+       driver: local
+       driver_opts:
+         type: none
+         o: bind
+         device: /srv/docker/volumes/qbittorrentvpn_config/_data
    ```
    Сохраните изменения (CTRL+O, затем Enter) и выйдите из nano (CTRL+X).
 
-2. **Запустите Docker Compose:**  
+4. **Запустите Docker Compose:**  
    В том же каталоге выполните:
    ```bash
    sudo docker compose -p qbittorrentvpn up -d
