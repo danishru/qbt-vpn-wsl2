@@ -64,7 +64,7 @@
 3. **Включение Mirrored Mode Networking**  
    Откройте PowerShell от имени администратора и выполните:
       ```powershell
-      if (!(Test-Path \$env:USERPROFILE\.wslconfig)) { New-Item -Path \$env:USERPROFILE\.wslconfig -ItemType File -Force }; notepad \$env:USERPROFILE\.wslconfig
+      if (!(Test-Path $env:USERPROFILE\.wslconfig)) { New-Item -Path $env:USERPROFILE\.wslconfig -ItemType File -Force }; notepad $env:USERPROFILE\.wslconfig
       ```
    В открытом файле добавьте:
       ```ini
