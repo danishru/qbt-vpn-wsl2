@@ -131,7 +131,6 @@
    ```
    Вставьте в открывшийся редактор следующий контент:
    ```yaml
-   version: '3.8'
    services:
      qbittorrentvpn:
        image: binhex/arch-qbittorrentvpn:latest
