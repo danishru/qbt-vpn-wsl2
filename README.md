@@ -173,7 +173,7 @@
 2. **Запустите Docker Compose:**  
    В том же каталоге выполните:
    ```bash
-   sudo docker-compose up -d
+   sudo docker compose up -d
    ```
 ---
 
