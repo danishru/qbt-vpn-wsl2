@@ -163,12 +163,10 @@
          - "8080:8080"
        volumes:
          - config:/config
-         - downloads:/downloads
          - /etc/localtime:/etc/localtime:ro
        restart: always
    volumes:
      config:
-     downloads:
    ```
    Сохраните изменения (CTRL+O, затем Enter) и выйдите из nano (CTRL+X).
 
@@ -190,7 +188,9 @@
    ```plaintext
    http://<IP-адрес_вашего_сервера>:${WEBUI_PORT}
    ```
-5. Для входа в веб-интерфейс qBittorrent используйте учетные данные, указанные в файле `supervisord.log` внутри volume `config`.
+4. Для входа в веб-интерфейс qBittorrent используйте учетные данные, указанные в файле `supervisord.log` внутри volume `config`.
+>[!IMPORTANT]  
+> По умолчанию qBittorrent настроен на скачивание файлов в директорию `/config/qBittorrent/downloads` внутри volume `config`.
 
 ---
 > **Примечание для уверенных пользователей:**  
