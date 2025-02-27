@@ -139,7 +139,7 @@
        cap_add:
          - NET_ADMIN
        healthcheck:
-         test: ["CMD-SHELL", "curl -fsSL http://localhost:\$${WEBUI_PORT}/api/v2/app/version"]
+         test: ["CMD-SHELL", "curl -fsSL http://localhost:$${WEBUI_PORT}/api/v2/app/version"]
          interval: 30s
          timeout: 10s
          retries: 3
